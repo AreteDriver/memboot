@@ -211,6 +211,67 @@ class TestMetaOps:
         assert store.get_meta("key") == "new"
 
 
+class TestFileMetaOps:
+    def test_set_and_get_all(self, store: MembootStore):
+        store.set_file_meta("a.py", 1000.0, 200, 5)
+        store.set_file_meta("b.py", 2000.0, 300, 3)
+        meta = store.get_all_file_meta()
+        assert meta == {
+            "a.py": (1000.0, 200, 5),
+            "b.py": (2000.0, 300, 3),
+        }
+
+    def test_get_all_empty(self, store: MembootStore):
+        assert store.get_all_file_meta() == {}
+
+    def test_upsert(self, store: MembootStore):
+        store.set_file_meta("a.py", 1000.0, 200, 5)
+        store.set_file_meta("a.py", 3000.0, 400, 10)
+        meta = store.get_all_file_meta()
+        assert meta["a.py"] == (3000.0, 400, 10)
+
+    def test_delete_file_meta(self, store: MembootStore):
+        store.set_file_meta("a.py", 1000.0, 200, 5)
+        assert store.delete_file_meta("a.py") is True
+        assert store.get_all_file_meta() == {}
+
+    def test_delete_file_meta_not_found(self, store: MembootStore):
+        assert store.delete_file_meta("nonexistent") is False
+
+    def test_clear_file_meta(self, store: MembootStore):
+        store.set_file_meta("a.py", 1000.0, 200, 5)
+        store.set_file_meta("b.py", 2000.0, 300, 3)
+        store.clear_file_meta()
+        assert store.get_all_file_meta() == {}
+
+    def test_delete_chunks_by_file(self, store: MembootStore):
+        store.add_chunks(
+            [
+                _make_chunk("c1", source_file="a.py"),
+                _make_chunk("c2", source_file="a.py"),
+                _make_chunk("c3", source_file="b.py"),
+            ]
+        )
+        deleted = store.delete_chunks_by_file("a.py")
+        assert deleted == 2
+        assert store.count_chunks() == 1
+        assert store.get_chunk("c3") is not None
+
+    def test_delete_chunks_by_file_none(self, store: MembootStore):
+        assert store.delete_chunks_by_file("nonexistent") == 0
+
+    def test_clear_chunks_also_clears_file_meta(self, store: MembootStore):
+        store.add_chunks([_make_chunk("c1")])
+        store.set_file_meta("a.py", 1000.0, 200, 5)
+        store.clear_chunks()
+        assert store.get_all_file_meta() == {}
+
+    def test_reset_clears_file_meta(self, store: MembootStore):
+        store.set_file_meta("a.py", 1000.0, 200, 5)
+        store.reset()
+        assert store.get_all_file_meta() == {}
+
+
 class TestLifecycle:
     def test_reset_clears_all(self, store: MembootStore):
         store.add_chunks([_make_chunk("c1")])

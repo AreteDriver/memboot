@@ -36,6 +36,13 @@ CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS file_meta (
+    path TEXT PRIMARY KEY,
+    mtime REAL NOT NULL,
+    size INTEGER NOT NULL,
+    chunk_count INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -113,10 +120,11 @@ class MembootStore:
         return row[0] if row else 0
 
     def clear_chunks(self) -> int:
-        """Delete all chunks. Returns count deleted."""
+        """Delete all chunks and file metadata. Returns chunk count deleted."""
         count = self.count_chunks()
         conn = self._get_conn()
         conn.execute("DELETE FROM chunks")
+        conn.execute("DELETE FROM file_meta")
         conn.commit()
         return count
 
@@ -226,13 +234,51 @@ class MembootStore:
         row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
         return row[0] if row else None
 
+    # -- File meta operations --
+
+    def set_file_meta(self, path: str, mtime: float, size: int, chunk_count: int) -> None:
+        """Store file metadata for incremental reindexing."""
+        conn = self._get_conn()
+        conn.execute(
+            "INSERT OR REPLACE INTO file_meta (path, mtime, size, chunk_count) VALUES (?, ?, ?, ?)",
+            (path, mtime, size, chunk_count),
+        )
+        conn.commit()
+
+    def get_all_file_meta(self) -> dict[str, tuple[float, int, int]]:
+        """Get all stored file metadata. Returns {path: (mtime, size, chunk_count)}."""
+        conn = self._get_conn()
+        rows = conn.execute("SELECT path, mtime, size, chunk_count FROM file_meta").fetchall()
+        return {path: (mtime, size, chunk_count) for path, mtime, size, chunk_count in rows}
+
+    def delete_file_meta(self, path: str) -> bool:
+        """Delete file metadata for a path. Returns True if found."""
+        conn = self._get_conn()
+        cursor = conn.execute("DELETE FROM file_meta WHERE path = ?", (path,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+    def clear_file_meta(self) -> None:
+        """Delete all file metadata."""
+        conn = self._get_conn()
+        conn.execute("DELETE FROM file_meta")
+        conn.commit()
+
+    def delete_chunks_by_file(self, source_file: str) -> int:
+        """Delete all chunks for a specific file. Returns count deleted."""
+        conn = self._get_conn()
+        cursor = conn.execute("DELETE FROM chunks WHERE source_file = ?", (source_file,))
+        conn.commit()
+        return cursor.rowcount
+
     # -- Lifecycle --
 
     def reset(self) -> None:
         """Drop and recreate all tables."""
         conn = self._get_conn()
         conn.executescript(
-            "DROP TABLE IF EXISTS chunks; DROP TABLE IF EXISTS memories; DROP TABLE IF EXISTS meta;"
+            "DROP TABLE IF EXISTS chunks; DROP TABLE IF EXISTS memories;"
+            " DROP TABLE IF EXISTS meta; DROP TABLE IF EXISTS file_meta;"
         )
         conn.commit()
         self._init_db()

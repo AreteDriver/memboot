@@ -77,7 +77,30 @@ def init_cmd(
     try:
         config = MembootConfig(embedding_backend=backend)
         info = index_project(project_dir.resolve(), config=config, force=force)
-        console.print(f"\n[green]Indexed {info.chunk_count} chunks[/green]")
+        meta = info.metadata
+        if meta:
+            new_chunks = meta.get("new_chunks", info.chunk_count)
+            changed = meta.get("changed_files", 0)
+            new_f = meta.get("new_files", 0)
+            unchanged = meta.get("unchanged_files", 0)
+            deleted = meta.get("deleted_files", 0)
+            parts = []
+            if changed:
+                parts.append(f"{changed} changed")
+            if new_f:
+                parts.append(f"{new_f} new")
+            if unchanged:
+                parts.append(f"{unchanged} unchanged")
+            if deleted:
+                parts.append(f"{deleted} deleted")
+            file_summary = ", ".join(parts)
+            console.print(
+                f"\n[green]Indexed {new_chunks} new chunks[/green] ({info.chunk_count} total)"
+            )
+            if file_summary:
+                console.print(f"[dim]Files: {file_summary}[/dim]")
+        else:
+            console.print(f"\n[green]Indexed {info.chunk_count} chunks[/green]")
         console.print(f"[dim]DB: {info.db_path}[/dim]")
         console.print(f"[dim]Backend: {info.embedding_backend}, dim: {info.embedding_dim}[/dim]")
         console.print()

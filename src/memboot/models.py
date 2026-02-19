@@ -85,6 +85,7 @@ class ProjectInfo(BaseModel):
     last_indexed: str | None = None
     embedding_dim: int = 0
     embedding_backend: str = "tfidf"
+    metadata: dict[str, int] = Field(default_factory=dict)
 
 
 class MembootConfig(BaseModel):

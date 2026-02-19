@@ -7,7 +7,7 @@ Zero-infrastructure persistent memory for any LLM. SQLite + TF-IDF vector search
 - **Version**: 0.1.0
 - **Python**: >=3.11
 - **Package layout**: `src/memboot/` (setuptools, `src` layout)
-- **Tests**: `tests/` (pytest, 249 tests, 95% coverage, fail_under=90)
+- **Tests**: `tests/` (pytest, 273 tests, 94% coverage, fail_under=90)
 - **License**: MIT
 
 ## Build & Run
