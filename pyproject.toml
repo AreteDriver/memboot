@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memboot"
-version = "0.1.0"
+version = "0.2.0"
 description = "Zero-infrastructure persistent memory for any LLM"
 readme = "README.md"
 license = {text = "MIT"}
