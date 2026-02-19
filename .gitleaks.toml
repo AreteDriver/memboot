@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+[allowlist]
+regexTarget = "match"
+regexes = [
+  '''memboot-v1''',
+]
+paths = [
+  '''tests/''',
+]
