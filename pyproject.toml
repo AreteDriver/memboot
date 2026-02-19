@@ -35,6 +35,7 @@ dependencies = [
 embed = ["sentence-transformers>=2.0"]
 mcp = ["mcp>=1.0"]
 pdf = ["pdfplumber>=0.10"]
+watch = ["watchdog>=3.0"]
 web = ["trafilatura>=1.6"]
 dev = [
     "pytest>=7.0",

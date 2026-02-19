@@ -264,6 +264,42 @@ def ingest(
 
 
 @app.command()
+def watch(
+    project_dir: Path = typer.Argument(".", help="Project directory to watch."),
+    debounce: float = typer.Option(2.0, "--debounce", "-d", help="Seconds to wait after changes."),
+    backend: str = typer.Option("tfidf", "--backend", "-b", help="Embedding backend."),
+) -> None:
+    """Watch project directory and auto-reindex on changes."""
+    from memboot.models import MembootConfig
+
+    config = MembootConfig(embedding_backend=backend)
+
+    def _on_reindex(info):
+        meta = info.metadata
+        new_chunks = meta.get("new_chunks", 0) if meta else 0
+        console.print(
+            f"[green]Reindexed:[/green] {new_chunks} new chunks ({info.chunk_count} total)"
+        )
+
+    console.print(f"[bold]Watching[/bold] {project_dir.resolve()}")
+    console.print(f"[dim]Debounce: {debounce}s | Backend: {backend}[/dim]")
+    console.print("[dim]Press Ctrl+C to stop.[/dim]\n")
+
+    try:
+        from memboot.watcher import watch_project
+
+        watch_project(
+            project_dir.resolve(),
+            config=config,
+            debounce=debounce,
+            on_reindex=_on_reindex,
+        )
+    except MembootError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+
+@app.command()
 def serve(
     project_dir: Path = typer.Option(".", "--project", "-p", help="Project directory."),
 ) -> None:

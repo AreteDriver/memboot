@@ -30,6 +30,7 @@ Optional extras:
 pip install memboot[embed]  # sentence-transformers for semantic embeddings
 pip install memboot[mcp]    # MCP server support
 pip install memboot[pdf]    # PDF ingestion
+pip install memboot[watch]  # File watching for auto-reindex
 pip install memboot[web]    # Web page ingestion
 ```
 
@@ -63,6 +64,7 @@ memboot status
 | `memboot status` | Show license tier and available features |
 | `memboot reset` | Clear all indexed data and memories |
 | `memboot ingest` | Add external files, PDFs, or URLs to memory |
+| `memboot watch` | Watch project and auto-reindex on changes |
 | `memboot serve` | Start MCP stdio server (Pro) |
 
 ## How It Works

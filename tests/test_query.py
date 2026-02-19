@@ -55,11 +55,15 @@ class TestRestoreEmbedder:
             _restore_embedder(store)
         store.close()
 
-    def test_non_tfidf_backend(self, tmp_path: Path):
+    def test_default_backend(self, tmp_path: Path):
         db_path = tmp_path / "test.db"
         store = MembootStore(db_path)
-        store.set_meta("embedding_backend", "tfidf")
-        # Default backend is tfidf if not set differently
+        # No backend set — defaults to tfidf
+        emb = TfidfEmbedder(max_features=10)
+        emb.fit(["test"])
+        store.set_meta("tfidf_state", json.dumps(emb.save_state()))
+        restored = _restore_embedder(store)
+        assert isinstance(restored, TfidfEmbedder)
         store.close()
 
 
@@ -161,3 +165,34 @@ class TestSearch:
 
         results = search("test", project, include_memories=False)
         assert all(not r.source.startswith("memory:") for r in results)
+
+    def test_search_includes_memories(self, tmp_path: Path, monkeypatch):
+        db_dir = tmp_path / ".memboot"
+        db_path = db_dir / "proj.db"
+        monkeypatch.setattr("memboot.query.get_db_path", lambda p: db_path)
+        project = tmp_path / "proj"
+        project.mkdir()
+        (project / "test.py").write_text("def hello(): pass\n")
+
+        with patch("memboot.indexer.get_db_path", lambda p: db_path):
+            from memboot.indexer import index_project
+
+            index_project(project)
+
+        # Add a memory with embedding
+        store = MembootStore(db_path)
+        emb_state = store.get_meta("tfidf_state")
+        emb = TfidfEmbedder.from_state(json.loads(emb_state))
+        vec = emb.embed_text("hello world note")
+        mem = Memory(
+            id="m1",
+            content="hello world note",
+            memory_type=MemoryType.NOTE,
+            embedding=vec.tolist(),
+        )
+        store.add_memory(mem)
+        store.close()
+
+        results = search("hello", project, include_memories=True)
+        sources = [r.source for r in results]
+        assert any(s.startswith("memory:") for s in sources)
