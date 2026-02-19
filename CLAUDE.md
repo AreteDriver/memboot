@@ -78,6 +78,7 @@ src/memboot/
 - **Store**: SQLite WAL mode, numpy float32 BLOB serialization, INSERT OR REPLACE for upserts.
 - **Embeddings**: TF-IDF state saved to store meta as JSON, restored on query/ingest.
 - **Licensing**: MMBT prefix, `memboot-v1` salt, SHA256 checksum. Key via `MEMBOOT_LICENSE` env var or `~/.memboot-license` file.
+- **Per-project DB**: `~/.memboot/{sha256(project_path)[:12]}.db` — one DB per project, auto-created on `init`.
 
 ## Optional Dependencies
 
