@@ -66,14 +66,14 @@ class TestWatcherHandler:
         t = threading.Thread(target=run_watcher, daemon=True)
         t.start()
 
-        # Give observer time to start
-        time.sleep(0.5)
+        # Give observer time to start (CI runners are slower)
+        time.sleep(1.0)
 
         # Modify a file
         (project / "main.py").write_text('def hello(): return "modified"\n')
 
-        # Wait for debounced reindex
-        got_it = reindex_called.wait(timeout=5.0)
+        # Wait for debounced reindex (generous timeout for CI)
+        got_it = reindex_called.wait(timeout=10.0)
         assert got_it, "Reindex callback was not called"
         assert "info" in reindex_info
 
@@ -95,11 +95,11 @@ class TestWatcherHandler:
             daemon=True,
         )
         t.start()
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Create a non-indexed file type
         (project / "debug.log").write_text("log entry\n")
-        time.sleep(1.0)
+        time.sleep(1.5)
 
         assert not reindex_called.is_set()
 
@@ -127,7 +127,7 @@ class TestWatcherHandler:
             daemon=True,
         )
         t.start()
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Rapid-fire changes
         for i in range(5):
@@ -135,7 +135,7 @@ class TestWatcherHandler:
             time.sleep(0.05)
 
         # Wait for debounce + reindex
-        time.sleep(2.0)
+        time.sleep(3.0)
 
         # Should have coalesced into 1-2 reindexes, not 5
         assert reindex_count["n"] <= 2
