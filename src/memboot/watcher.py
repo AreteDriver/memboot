@@ -95,7 +95,7 @@ def watch_project(
         while observer.is_alive():
             time.sleep(1)
     except KeyboardInterrupt:
-        pass
+        pass  # User requested stop — clean shutdown below
     finally:
         observer.stop()
         observer.join()

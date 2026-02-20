@@ -23,12 +23,12 @@ class TestWatchProjectImportError:
             patch.dict("sys.modules", mods),
             pytest.raises(MembootError, match="watchdog"),
         ):
-            from importlib import reload
+            import importlib
 
-            import memboot.watcher
+            import memboot.watcher as watcher_mod  # noqa: F811
 
-            reload(memboot.watcher)
-            memboot.watcher.watch_project(Path("."))
+            importlib.reload(watcher_mod)
+            watcher_mod.watch_project(Path("."))
 
 
 class TestWatcherHandler:
@@ -61,7 +61,7 @@ class TestWatcherHandler:
                         on_reindex=on_reindex,
                     )
             except Exception:
-                pass
+                pass  # Watcher thread — errors expected during test teardown
 
         t = threading.Thread(target=run_watcher, daemon=True)
         t.start()
