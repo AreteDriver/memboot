@@ -5,14 +5,32 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-**Zero-infrastructure persistent memory for any LLM.**
+**Persistent memory for LLMs that works offline. No API keys. No servers. No cloud.**
 
-Index your codebase, store decisions, and search everything with vector similarity — all local, all SQLite, no API keys needed.
+Every other memory tool requires an LLM call to store and retrieve, a managed API, or an HTTP server running in the background. memboot requires none of that. It's SQLite + TF-IDF on your local disk — works on an airplane, works in CI, works without giving a third party access to your codebase.
+
+```
+$ memboot init .
+  Indexed 142 files, 1,847 chunks
+
+$ memboot query "authentication flow"
+  src/auth/jwt.py:create_token     0.89  "Creates signed JWT with user claims..."
+  src/auth/middleware.py:verify     0.84  "Extracts and validates bearer token..."
+  src/models/user.py:User          0.71  "User model with hashed password..."
+
+$ memboot remember "Use JWT for API auth, sessions for web" --type decision
+  Stored decision #14
+
+$ memboot context "auth" --max-tokens 4000
+  # Context: auth (3,842 tokens)
+  ## src/auth/jwt.py
+  ...
+```
 
 ## Features
 
 - **Smart chunking** — AST-aware Python extraction, Markdown heading splits, YAML/JSON key-level, sliding window fallback
-- **Local embeddings** — Built-in TF-IDF (zero deps), optional sentence-transformers for semantic search
+- **Fully offline** — Built-in TF-IDF embeddings with zero external dependencies. Optional sentence-transformers for semantic search
 - **Episodic memory** — Store decisions, patterns, observations alongside your code index
 - **Context builder** — Token-budgeted markdown blocks ready for LLM prompts
 - **MCP server** — Expose memory as tools for Claude Code, Cursor, and other MCP clients (Pro)
@@ -84,6 +102,15 @@ Memories ───────→ Embedder ──→ Store ───────
 4. **Context** — Build token-budgeted markdown blocks with source attribution for LLM consumption
 
 Each project gets its own SQLite database at `~/.memboot/{hash}.db`. No servers, no API keys, no network calls.
+
+## How It's Different
+
+| | Works offline | No API keys | No background server | CLI-native |
+|---|:---:|:---:|:---:|:---:|
+| **memboot** | Yes | Yes | Yes | Yes |
+| Mem0 | No (requires LLM) | No | No | No |
+| Memori | No (managed API) | No | N/A | No |
+| OpenMemory | No (HTTP server) | No | No | Partial |
 
 ## Architecture
 
