@@ -17,6 +17,7 @@ from memboot.licensing import (
     get_upgrade_message,
     has_feature,
 )
+from memboot.telemetry import track_command, track_pro_gate
 
 app = typer.Typer(
     name="memboot",
@@ -48,6 +49,7 @@ def main(
 @app.command()
 def status() -> None:
     """Show license status and available features."""
+    track_command("status")
     info = get_license_info()
     tier_config = TIER_DEFINITIONS[info.tier]
 
@@ -71,6 +73,7 @@ def init_cmd(
     backend: str = typer.Option("tfidf", "--backend", "-b", help="Embedding backend."),
 ) -> None:
     """Scan, chunk, embed, and index a project."""
+    track_command("init")
     from memboot.indexer import index_project
     from memboot.models import MembootConfig
 
@@ -117,6 +120,7 @@ def query(
     json: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
     """Search project memory."""
+    track_command("query")
     from memboot.query import search
 
     try:
@@ -159,6 +163,7 @@ def remember(
     tags: list[str] | None = typer.Option(None, "--tag", help="Tags (repeatable)."),
 ) -> None:
     """Store an episodic memory."""
+    track_command("remember")
     from memboot.memory import remember as remember_fn
     from memboot.models import MemoryType
 
@@ -186,6 +191,7 @@ def context(
     top_k: int = typer.Option(10, "--top-k", "-k", help="Max results to consider."),
 ) -> None:
     """Export formatted context block."""
+    track_command("context")
     from memboot.context import build_context
 
     try:
@@ -202,6 +208,7 @@ def reset(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
 ) -> None:
     """Clear all indexed data and memories."""
+    track_command("reset")
     from memboot.indexer import get_db_path
 
     db_path = get_db_path(project_dir.resolve())
@@ -228,8 +235,10 @@ def ingest(
     project_dir: Path = typer.Option(".", "--project", "-p", help="Project directory."),
 ) -> None:
     """Ingest an external file into project memory."""
+    track_command("ingest")
     if source.startswith(("http://", "https://")):
         if not has_feature("ingest_web"):
+            track_pro_gate("ingest_web")
             console.print(f"[yellow]{get_upgrade_message('ingest_web')}[/yellow]")
             raise typer.Exit(1)
         from memboot.ingest.web import ingest_url
@@ -242,6 +251,7 @@ def ingest(
             raise typer.Exit(1) from exc
     elif source.lower().endswith(".pdf"):
         if not has_feature("ingest_pdf"):
+            track_pro_gate("ingest_pdf")
             console.print(f"[yellow]{get_upgrade_message('ingest_pdf')}[/yellow]")
             raise typer.Exit(1)
         from memboot.ingest.pdf import ingest_pdf
@@ -270,6 +280,7 @@ def watch(
     backend: str = typer.Option("tfidf", "--backend", "-b", help="Embedding backend."),
 ) -> None:
     """Watch project directory and auto-reindex on changes."""
+    track_command("watch")
     from memboot.models import MembootConfig
 
     config = MembootConfig(embedding_backend=backend)
@@ -304,7 +315,9 @@ def serve(
     project_dir: Path = typer.Option(".", "--project", "-p", help="Project directory."),
 ) -> None:
     """Start MCP stdio server (Pro feature)."""
+    track_command("serve")
     if not has_feature("serve"):
+        track_pro_gate("serve")
         console.print(f"[yellow]{get_upgrade_message('serve')}[/yellow]")
         raise typer.Exit(1)
 
@@ -317,3 +330,79 @@ def serve(
     except MembootError as exc:
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from exc
+
+
+@app.command()
+def stats(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Show local usage telemetry (requires MEMBOOT_TELEMETRY=1)."""
+    from memboot.telemetry import TelemetryStore, _telemetry_dir, is_enabled
+
+    track_command("stats")
+
+    if not is_enabled():
+        console.print(
+            "[dim]Telemetry is disabled. "
+            "Set MEMBOOT_TELEMETRY=1 to enable local usage tracking.[/dim]"
+        )
+        return
+
+    db_file = _telemetry_dir() / "telemetry.db"
+    if not db_file.exists():
+        console.print("[dim]No telemetry data yet.[/dim]")
+        return
+
+    ts = TelemetryStore(db_file)
+    try:
+        commands = ts.get_command_counts()
+        pro_gates = ts.get_pro_gate_counts()
+        total = ts.get_total_events()
+        first = ts.get_first_event_time()
+        last = ts.get_last_event_time()
+        activity = ts.get_daily_activity()
+
+        if json_output:
+            data = {
+                "total_events": total,
+                "first_event": first,
+                "last_event": last,
+                "commands": commands,
+                "pro_gate_hits": pro_gates,
+                "daily_activity": [{"date": d, "count": c} for d, c in activity],
+            }
+            console.print(json_mod.dumps(data, indent=2))
+        else:
+            overview = Table(title="Telemetry Overview")
+            overview.add_column("Metric", style="cyan")
+            overview.add_column("Value", style="green")
+            overview.add_row("Total Events", str(total))
+            overview.add_row("First Event", first or "n/a")
+            overview.add_row("Last Event", last or "n/a")
+            console.print(overview)
+
+            if commands:
+                cmd_table = Table(title="Command Usage")
+                cmd_table.add_column("Command", style="cyan")
+                cmd_table.add_column("Count", style="green", justify="right")
+                for name, count in commands.items():
+                    cmd_table.add_row(name, str(count))
+                console.print(cmd_table)
+
+            if pro_gates:
+                gate_table = Table(title="Pro Feature Gate Hits")
+                gate_table.add_column("Feature", style="cyan")
+                gate_table.add_column("Attempts", style="yellow", justify="right")
+                for name, count in pro_gates.items():
+                    gate_table.add_row(name, str(count))
+                console.print(gate_table)
+
+            if activity:
+                act_table = Table(title="Daily Activity (Last 7 Days)")
+                act_table.add_column("Date", style="cyan")
+                act_table.add_column("Events", style="green", justify="right")
+                for day, count in activity:
+                    act_table.add_row(day, str(count))
+                console.print(act_table)
+    finally:
+        ts.close()
